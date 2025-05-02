@@ -30,10 +30,19 @@
         <option value="Personal">Personal</option>
         <option value="Other">Other</option>
       </select>
+      <label class="flex items-center space-x-2">
+        <input 
+          id="addDueDateCheckbox" 
+          type="checkbox" 
+          class="h-5 w-5 text-blue-500 focus:ring-blue-500 border-gray-300 rounded"
+          onchange="toggleDueDateInput()"
+        >
+        <span class="text-gray-700">Add Due Date</span>
+      </label>
       <input 
         id="dueDateInput" 
         type="datetime-local" 
-        class="p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        class="hidden p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
       >
       <button 
         onclick="addTask()" 
@@ -98,6 +107,16 @@
       });
     }
 
+    // Toggle due date input visibility
+    function toggleDueDateInput() {
+      const checkbox = document.getElementById('addDueDateCheckbox');
+      const dueDateInput = document.getElementById('dueDateInput');
+      dueDateInput.classList.toggle('hidden', !checkbox.checked);
+      if (!checkbox.checked) {
+        dueDateInput.value = ''; // Clear input when hidden
+      }
+    }
+
     // Render tasks
     function renderTasks() {
       const taskList = document.getElementById('taskList');
@@ -159,26 +178,34 @@
     function addTask() {
       const taskInput = document.getElementById('taskInput');
       const categorySelect = document.getElementById('categorySelect');
+      const dueDateCheckbox = document.getElementById('addDueDateCheckbox');
       const dueDateInput = document.getElementById('dueDateInput');
       const taskText = taskInput.value.trim();
       const category = categorySelect.value;
-      const dueDate = dueDateInput.value;
+      const dueDate = dueDateCheckbox.checked ? dueDateInput.value : null;
 
       if (taskText === '') {
         alert('Please enter a task!');
         return;
       }
 
+      if (dueDateCheckbox.checked && !dueDate) {
+        alert('Please select a due date or uncheck the "Add Due Date" option!');
+        return;
+      }
+
       tasks.push({
         text: taskText,
         category: category,
-        dueDate: dueDate || null, // Store null if no due date
+        dueDate: dueDate, // Store null if no due date
         completed: false
       });
       saveTasks();
       renderTasks();
       taskInput.value = '';
       dueDateInput.value = '';
+      dueDateCheckbox.checked = false;
+      toggleDueDateInput(); // Hide due date input after adding
     }
 
     // Set a reminder notification
