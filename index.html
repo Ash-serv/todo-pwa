@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,7 +9,7 @@
   <!-- SheetJS for Excel processing -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <!-- Link to manifest for PWA -->
-  <link rel="manifest" href="manifest.json">
+  <link rel="manifest" href="/todo-pwa/manifest.json">
   <!-- Theme color for PWA -->
   <meta name="theme-color" content="#3B82F6">
 </head>
@@ -83,7 +82,7 @@
           csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
           return csv;
         } catch (e) {
-          console.error(e);
+          console.error('Excel processing error:', e);
           return "";
         }
       }
@@ -99,13 +98,17 @@
     function formatDate(dateString) {
       if (!dateString) return 'No due date';
       const date = new Date(dateString);
-      if (isNaN(date.getTime())) return 'Invalid date';
+      if (isNaN(date.getTime())) {
+        console.warn('Invalid date:', dateString);
+        return 'Invalid date';
+      }
       return date.toLocaleString('en-US', {
         weekday: 'short',
         month: 'short',
         day: 'numeric',
         hour: '2-digit',
-        minute: '2-digit'
+        minute: '2-digit',
+        timeZone: 'UTC'
       });
     }
 
@@ -113,8 +116,11 @@
     function isOverdue(dueDate) {
       if (!dueDate) return false;
       const dueDateTime = new Date(dueDate).getTime();
-      if (isNaN(dueDateTime)) return false;
-      return dueDateTime < new Date().getTime();
+      if (isNaN(dueDateTime)) {
+        console.warn('Invalid due date for overdue check:', dueDate);
+        return false;
+      }
+      return dueDateTime < Date.now();
     }
 
     // Toggle due date input visibility
@@ -132,7 +138,7 @@
       const taskList = document.getElementById('taskList');
       taskList.innerHTML = '';
       tasks.forEach((task, index) => {
-        console.log('Rendering task:', task); // Debug log
+        console.log('Rendering task:', task);
         const li = document.createElement('li');
         li.className = 'flex flex-col p-2 bg-white border border-gray-200 rounded-lg shadow-sm';
         
@@ -182,6 +188,7 @@
 
     // Save tasks to localStorage
     function saveTasks() {
+      console.log('Saving tasks:', tasks);
       localStorage.setItem('tasks', JSON.stringify(tasks));
     }
 
@@ -207,16 +214,17 @@
 
       if (dueDate) {
         const dueDateTime = new Date(dueDate).getTime();
-        const now = new Date().getTime();
+        const now = Date.now();
         const oneYearFromNow = now + 365 * 24 * 60 * 60 * 1000; // 1 year in milliseconds
 
         if (isNaN(dueDateTime)) {
+          console.warn('Invalid due date input:', dueDate);
           alert('Invalid due date selected!');
           return;
         }
 
-        if (dueDateTime < now) {
-          alert('Due date cannot be in the past!');
+        if (dueDateTime <= now) {
+          alert('Due date must be in the future!');
           return;
         }
 
@@ -229,53 +237,53 @@
       const newTask = {
         text: taskText,
         category: category,
-        dueDate: dueDate, // Store null if no due date
+        dueDate: dueDate,
         completed: false
       };
-      console.log('Adding task:', newTask); // Debug log
+      console.log('Adding task:', newTask);
       tasks.push(newTask);
       saveTasks();
       renderTasks();
       taskInput.value = '';
       dueDateInput.value = '';
       dueDateCheckbox.checked = false;
-      toggleDueDateInput(); // Hide due date input after adding
+      toggleDueDateInput();
     }
 
     // Set a reminder notification
     function setReminder(taskText, dueDate) {
-      console.log('Setting reminder for:', taskText, dueDate); // Debug log
+      console.log('Setting reminder for:', taskText, dueDate);
       if (!("Notification" in window)) {
         alert("This browser does not support notifications.");
         return;
       }
 
-      // Require a due date for reminders
       if (!dueDate) {
         alert("A due date is required to set a reminder.");
         return;
       }
 
       const dueDateTime = new Date(dueDate).getTime();
-      const now = new Date().getTime();
+      const now = Date.now();
       const delay = dueDateTime - now;
 
       if (isNaN(dueDateTime)) {
+        console.warn('Invalid due date for reminder:', dueDate);
         alert("Invalid due date for reminder!");
         return;
       }
 
       if (delay <= 0) {
-        alert("The due date is in the past. Please set a future due date for the reminder.");
+        alert("Due date must be in the future for reminders!");
         return;
       }
 
       if (Notification.permission === "granted") {
         setTimeout(() => {
-          console.log('Triggering notification for:', taskText); // Debug log
+          console.log('Triggering notification for:', taskText);
           new Notification("To-Do Reminder", {
             body: `Time to work on: ${taskText}\nDue: ${formatDate(dueDate)}`,
-            icon: 'icon-192x192.png'
+            icon: '/todo-pwa/icon-192x192.png'
           });
         }, delay);
         alert(`Reminder set for ${formatDate(dueDate)}`);
@@ -283,10 +291,10 @@
         Notification.requestPermission().then(permission => {
           if (permission === "granted") {
             setTimeout(() => {
-              console.log('Triggering notification for:', taskText); // Debug log
+              console.log('Triggering notification for:', taskText);
               new Notification("To-Do Reminder", {
                 body: `Time to work on: ${taskText}\nDue: ${formatDate(dueDate)}`,
-                icon: 'icon-192x192.png'
+                icon: '/todo-pwa/icon-192x192.png'
               });
             }, delay);
             alert(`Reminder set for ${formatDate(dueDate)}`);
@@ -305,9 +313,9 @@
     // Register service worker for PWA
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-          .then(reg => console.log('Service Worker registered'))
-          .catch(err => console.log('Service Worker registration failed:', err));
+        navigator.serviceWorker.register('/todo-pwa/sw.js')
+          .then(reg => console.log('Service Worker registered:', reg))
+          .catch(err => console.error('Service Worker registration failed:', err));
       });
     }
 
