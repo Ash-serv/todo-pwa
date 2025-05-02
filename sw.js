@@ -107,6 +107,12 @@
       });
     }
 
+    // Check if a due date is overdue
+    function isOverdue(dueDate) {
+      if (!dueDate) return false;
+      return new Date(dueDate).getTime() < new Date().getTime();
+    }
+
     // Toggle due date input visibility
     function toggleDueDateInput() {
       const checkbox = document.getElementById('addDueDateCheckbox');
@@ -154,7 +160,7 @@
         // Due date display
         const dueDateDiv = document.createElement('div');
         dueDateDiv.textContent = `Due: ${formatDate(task.dueDate)}`;
-        dueDateDiv.className = 'text-sm text-gray-600 mt-1';
+        dueDateDiv.className = `text-sm mt-1 ${isOverdue(task.dueDate) ? 'text-red-600' : 'text-gray-600'}`;
 
         // Reminder button
         const reminderBtn = document.createElement('button');
@@ -194,6 +200,22 @@
         return;
       }
 
+      if (dueDate) {
+        const dueDateTime = new Date(dueDate).getTime();
+        const now = new Date().getTime();
+        const oneYearFromNow = now + 365 * 24 * 60 * 60 * 1000; // 1 year in milliseconds
+
+        if (dueDateTime < now) {
+          alert('Due date cannot be in the past!');
+          return;
+        }
+
+        if (dueDateTime > oneYearFromNow) {
+          alert('Due date cannot be more than 1 year in the future!');
+          return;
+        }
+      }
+
       tasks.push({
         text: taskText,
         category: category,
@@ -215,15 +237,9 @@
         return;
       }
 
-      // Check if due date is provided and valid
+      // Require a due date for reminders
       if (!dueDate) {
-        alert("No due date set for this task. Reminder will trigger in 5 seconds.");
-        setTimeout(() => {
-          new Notification("To-Do Reminder", {
-            body: `Time to work on: ${taskText}`,
-            icon: 'icon-192x192.png'
-          });
-        }, 5000);
+        alert("A due date is required to set a reminder.");
         return;
       }
 
