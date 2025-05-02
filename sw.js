@@ -1,5 +1,3 @@
-
-
 const CACHE_NAME = 'todo-pwa-v4'; // Update version
 
 // Install event: Cache essential files and activate immediately
