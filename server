@@ -3,3 +3,4 @@ mkdir todo-pwa-server
 cd todo-pwa-server
 npm init -y
 npm install express web-push node-schedule
+npx web-push generate-vapid-keys
