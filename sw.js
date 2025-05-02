@@ -98,6 +98,7 @@
     function formatDate(dateString) {
       if (!dateString) return 'No due date';
       const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'Invalid date';
       return date.toLocaleString('en-US', {
         weekday: 'short',
         month: 'short',
@@ -110,7 +111,9 @@
     // Check if a due date is overdue
     function isOverdue(dueDate) {
       if (!dueDate) return false;
-      return new Date(dueDate).getTime() < new Date().getTime();
+      const dueDateTime = new Date(dueDate).getTime();
+      if (isNaN(dueDateTime)) return false;
+      return dueDateTime < new Date().getTime();
     }
 
     // Toggle due date input visibility
@@ -128,6 +131,7 @@
       const taskList = document.getElementById('taskList');
       taskList.innerHTML = '';
       tasks.forEach((task, index) => {
+        console.log('Rendering task:', task); // Debug log
         const li = document.createElement('li');
         li.className = 'flex flex-col p-2 bg-white border border-gray-200 rounded-lg shadow-sm';
         
@@ -160,7 +164,7 @@
         // Due date display
         const dueDateDiv = document.createElement('div');
         dueDateDiv.textContent = `Due: ${formatDate(task.dueDate)}`;
-        dueDateDiv.className = `text-sm mt-1 ${isOverdue(task.dueDate) ? 'text-red-600' : 'text-gray-600'}`;
+        dueDateDiv.className = `text-sm mt-1 ${isOverdue(task.dueDate) ? 'text-red-600 font-semibold' : 'text-gray-600'}`;
 
         // Reminder button
         const reminderBtn = document.createElement('button');
@@ -205,6 +209,11 @@
         const now = new Date().getTime();
         const oneYearFromNow = now + 365 * 24 * 60 * 60 * 1000; // 1 year in milliseconds
 
+        if (isNaN(dueDateTime)) {
+          alert('Invalid due date selected!');
+          return;
+        }
+
         if (dueDateTime < now) {
           alert('Due date cannot be in the past!');
           return;
@@ -216,12 +225,14 @@
         }
       }
 
-      tasks.push({
+      const newTask = {
         text: taskText,
         category: category,
         dueDate: dueDate, // Store null if no due date
         completed: false
-      });
+      };
+      console.log('Adding task:', newTask); // Debug log
+      tasks.push(newTask);
       saveTasks();
       renderTasks();
       taskInput.value = '';
@@ -232,6 +243,7 @@
 
     // Set a reminder notification
     function setReminder(taskText, dueDate) {
+      console.log('Setting reminder for:', taskText, dueDate); // Debug log
       if (!("Notification" in window)) {
         alert("This browser does not support notifications.");
         return;
@@ -247,6 +259,11 @@
       const now = new Date().getTime();
       const delay = dueDateTime - now;
 
+      if (isNaN(dueDateTime)) {
+        alert("Invalid due date for reminder!");
+        return;
+      }
+
       if (delay <= 0) {
         alert("The due date is in the past. Please set a future due date for the reminder.");
         return;
@@ -254,6 +271,7 @@
 
       if (Notification.permission === "granted") {
         setTimeout(() => {
+          console.log('Triggering notification for:', taskText); // Debug log
           new Notification("To-Do Reminder", {
             body: `Time to work on: ${taskText}\nDue: ${formatDate(dueDate)}`,
             icon: 'icon-192x192.png'
@@ -264,6 +282,7 @@
         Notification.requestPermission().then(permission => {
           if (permission === "granted") {
             setTimeout(() => {
+              console.log('Triggering notification for:', taskText); // Debug log
               new Notification("To-Do Reminder", {
                 body: `Time to work on: ${taskText}\nDue: ${formatDate(dueDate)}`,
                 icon: 'icon-192x192.png'
