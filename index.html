@@ -96,7 +96,7 @@
     // Load tasks from localStorage on page load
     let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
 
-    // Format date for display in local timezone
+    // Format date for display, handling both ISO and datetime-local formats
     function formatDate(dateString) {
       if (!dateString) return 'No due date';
       const date = new Date(dateString);
@@ -129,6 +129,7 @@
     function toggleDueDateInput() {
       const checkbox = document.getElementById('addDueDateCheckbox');
       const dueDateInput = document.getElementById('dueDateInput');
+      console.log('Toggling due date input, checked:', checkbox.checked);
       dueDateInput.classList.toggle('hidden', !checkbox.checked);
       if (!checkbox.checked) {
         dueDateInput.value = ''; // Clear input when hidden
@@ -179,4 +180,182 @@
         const reminderBtn = document.createElement('button');
         reminderBtn.textContent = 'Set Reminder';
         reminderBtn.className = 'mt-2 bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600';
-        reminderBtn.onclick = () => setReminder(task.text, task.d
+        reminderBtn.onclick = () => setReminder(task.text, task.dueDate);
+
+        li.appendChild(taskContent);
+        li.appendChild(dueDateDiv);
+        li.appendChild(reminderBtn);
+        taskList.appendChild(li);
+      });
+    }
+
+    // Save tasks to localStorage
+    function saveTasks() {
+      console.log('Saving tasks:', tasks);
+      localStorage.setItem('tasks', JSON.stringify(tasks));
+    }
+
+    // Add a task
+    function addTask() {
+      const taskInput = document.getElementById('taskInput');
+      const categorySelect = document.getElementById('categorySelect');
+      const dueDateCheckbox = document.getElementById('addDueDateCheckbox');
+      const dueDateInput = document.getElementById('dueDateInput');
+      const taskText = taskInput.value.trim();
+      const category = categorySelect.value;
+      const dueDate = dueDateCheckbox.checked ? dueDateInput.value : null;
+
+      if (taskText === '') {
+        alert('Please enter a task!');
+        return;
+      }
+
+      if (dueDateCheckbox.checked && !dueDate) {
+        alert('Please select a due date or uncheck the "Add Due Date" option!');
+        return;
+      }
+
+      if (dueDate) {
+        const dueDateObj = new Date(dueDate);
+        console.log('Due date input:', dueDate, 'Parsed:', dueDateObj);
+        if (isNaN(dueDateObj.getTime())) {
+          console.warn('Invalid due date input:', dueDate);
+          alert('Invalid due date selected! Please choose a valid date and time.');
+          return;
+        }
+
+        const dueDateTime = dueDateObj.getTime();
+        const now = Date.now();
+        const oneYearFromNow = now + 365 * 24 * 60 * 60 * 1000; // 1 year in milliseconds
+
+        if (dueDateTime <= now) {
+          alert('Due date must be in the future!');
+          return;
+        }
+
+        if (dueDateTime > oneYearFromNow) {
+          alert('Due date cannot be more than 1 year in the future!');
+          return;
+        }
+      }
+
+      const newTask = {
+        text: taskText,
+        category: category,
+        dueDate: dueDate, // Store raw datetime-local value
+        completed: false
+      };
+      console.log('Adding task:', newTask);
+      tasks.push(newTask);
+      saveTasks();
+      renderTasks();
+      taskInput.value = '';
+      dueDateInput.value = '';
+      dueDateCheckbox.checked = false;
+      toggleDueDateInput();
+    }
+
+    // Set a reminder notification
+    function setReminder(taskText, dueDate) {
+      console.log('Setting reminder for:', taskText, dueDate);
+      if (!("Notification" in window)) {
+        alert("This browser does not support notifications.");
+        return;
+      }
+
+      if (!dueDate) {
+        alert("A due date is required to set a reminder.");
+        return;
+      }
+
+      const dueDateTime = new Date(dueDate).getTime();
+      const now = Date.now();
+      const delay = dueDateTime - now;
+
+      if (isNaN(dueDateTime)) {
+        console.warn('Invalid due date for reminder:', dueDate);
+        alert("Invalid due date for reminder!");
+        return;
+      }
+
+      if (delay <= 0) {
+        alert("Due date must be in the future for reminders!");
+        return;
+      }
+
+      if (Notification.permission === "granted") {
+        setTimeout(() => {
+          console.log('Triggering notification for:', taskText);
+          new Notification("To-Do Reminder", {
+            body: `Time to work on: ${taskText}\nDue: ${formatDate(dueDate)}`,
+            icon: '/todo-pwa/icon-192x192.png'
+          });
+        }, delay);
+        alert(`Reminder set for ${formatDate(dueDate)}`);
+      } else if (Notification.permission !== "denied") {
+        Notification.requestPermission().then(permission => {
+          if (permission === "granted") {
+            setTimeout(() => {
+              console.log('Triggering notification for:', taskText);
+              new Notification("To-Do Reminder", {
+                body: `Time to work on: ${taskText}\nDue: ${formatDate(dueDate)}`,
+                icon: '/todo-pwa/icon-192x192.png'
+              });
+            }, delay);
+            alert(`Reminder set for ${formatDate(dueDate)}`);
+          }
+        });
+      }
+    }
+
+    // Allow adding task with Enter key
+    document.getElementById('taskInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        addTask();
+      }
+    });
+
+    // Register service worker with enhanced update logic
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        // Check for outdated version in localStorage
+        const currentVersion = '4';
+        const storedVersion = localStorage.getItem('appVersion');
+        if (storedVersion && storedVersion !== currentVersion) {
+          console.log('Detected old version:', storedVersion, 'Forcing update to:', currentVersion);
+          caches.keys().then(cacheNames => {
+            return Promise.all(cacheNames.map(name => caches.delete(name)));
+          }).then(() => {
+            localStorage.setItem('appVersion', currentVersion);
+            alert('Updating to Version 4. Please wait...');
+            window.location.reload(true); // Force hard reload
+          });
+        } else {
+          localStorage.setItem('appVersion', currentVersion);
+        }
+
+        navigator.serviceWorker.register('/todo-pwa/sw.js?v=4')
+          .then(reg => {
+            console.log('Service Worker registered:', reg);
+            reg.update(); // Force check for updates
+            // Listen for new service worker
+            reg.addEventListener('updatefound', () => {
+              const newWorker = reg.installing;
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  alert('A new version of the app is available! Refreshing...');
+                  localStorage.setItem('appVersion', currentVersion);
+                  window.location.reload(true); // Force hard reload
+                }
+              });
+            });
+          })
+          .catch(err => console.error('Service Worker registration failed:', err));
+      });
+    }
+
+    // Initial render
+    renderTasks();
+  </script>
+</body>
+</html>
