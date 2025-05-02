@@ -1,43 +1,4 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -45,6 +6,8 @@
   <title>To-Do List PWA</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- SheetJS for Excel processing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <!-- Link to manifest for PWA -->
   <link rel="manifest" href="manifest.json">
   <!-- Theme color for PWA -->
@@ -67,6 +30,11 @@
         <option value="Personal">Personal</option>
         <option value="Other">Other</option>
       </select>
+      <input 
+        id="dueDateInput" 
+        type="datetime-local" 
+        class="p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
       <button 
         onclick="addTask()" 
         class="bg-blue-500 text-white p-2 rounded-lg hover:bg-blue-600"
@@ -79,9 +47,56 @@
     <ul id="taskList" class="space-y-2"></ul>
   </div>
 
+  <script type="text/javascript">
+    // Excel processing script (unchanged)
+    var gk_isXlsx = false;
+    var gk_xlsxFileLookup = {};
+    var gk_fileData = {};
+    function filledCell(cell) {
+      return cell !== '' && cell != null;
+    }
+    function loadFileData(filename) {
+      if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+        try {
+          var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+          var firstSheetName = workbook.SheetNames[0];
+          var worksheet = workbook.Sheets[firstSheetName];
+          var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+          var filteredData = jsonData.filter(row => row.some(filledCell));
+          var headerRowIndex = filteredData.findIndex((row, index) =>
+            row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+          );
+          if (headerRowIndex === -1 || headerRowIndex > 25) {
+            headerRowIndex = 0;
+          }
+          var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex));
+          csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+          return csv;
+        } catch (e) {
+          console.error(e);
+          return "";
+        }
+      }
+      return gk_fileData[filename] || "";
+    }
+  </script>
+
   <script>
     // Load tasks from localStorage on page load
     let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+
+    // Format date for display
+    function formatDate(dateString) {
+      if (!dateString) return 'No due date';
+      const date = new Date(dateString);
+      return date.toLocaleString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
 
     // Render tasks
     function renderTasks() {
@@ -117,13 +132,19 @@
         taskContent.appendChild(taskSpan);
         taskContent.appendChild(deleteBtn);
 
+        // Due date display
+        const dueDateDiv = document.createElement('div');
+        dueDateDiv.textContent = `Due: ${formatDate(task.dueDate)}`;
+        dueDateDiv.className = 'text-sm text-gray-600 mt-1';
+
         // Reminder button
         const reminderBtn = document.createElement('button');
         reminderBtn.textContent = 'Set Reminder';
         reminderBtn.className = 'mt-2 bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600';
-        reminderBtn.onclick = () => setReminder(task.text);
+        reminderBtn.onclick = () => setReminder(task.text, task.dueDate);
 
         li.appendChild(taskContent);
+        li.appendChild(dueDateDiv);
         li.appendChild(reminderBtn);
         taskList.appendChild(li);
       });
@@ -138,8 +159,10 @@
     function addTask() {
       const taskInput = document.getElementById('taskInput');
       const categorySelect = document.getElementById('categorySelect');
+      const dueDateInput = document.getElementById('dueDateInput');
       const taskText = taskInput.value.trim();
       const category = categorySelect.value;
+      const dueDate = dueDateInput.value;
 
       if (taskText === '') {
         alert('Please enter a task!');
@@ -149,15 +172,17 @@
       tasks.push({
         text: taskText,
         category: category,
+        dueDate: dueDate || null, // Store null if no due date
         completed: false
       });
       saveTasks();
       renderTasks();
       taskInput.value = '';
+      dueDateInput.value = '';
     }
 
     // Set a reminder notification
-    function setReminder(taskText) {
+    function setReminder(taskText, dueDate) {
       if (!("Notification" in window)) {
         alert("This browser does not support notifications.");
         return;
@@ -166,7 +191,7 @@
       if (Notification.permission === "granted") {
         setTimeout(() => {
           new Notification("To-Do Reminder", {
-            body: `Time to work on: ${taskText}`,
+            body: `Time to work on: ${taskText}${dueDate ? `\nDue: ${formatDate(dueDate)}` : ''}`,
             icon: 'icon-192x192.png'
           });
         }, 5000); // 5-second delay for testing
@@ -175,7 +200,7 @@
           if (permission === "granted") {
             setTimeout(() => {
               new Notification("To-Do Reminder", {
-                body: `Time to work on: ${taskText}`,
+                body: `Time to work on: ${taskText}${dueDate ? `\nDue: ${formatDate(dueDate)}` : ''}`,
                 icon: 'icon-192x192.png'
               });
             }, 5000);
