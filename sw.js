@@ -1,13 +1,13 @@
-
-const CACHE_NAME = 'todo-pwa-v3'; // Update version for new files
+const CACHE_NAME = 'todo-pwa-v4'; // Update version
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
       return cache.addAll([
-        '/',
-        '/index.html',
-        '/manifest.json',
-        '/icon-192x192.png'
+        '/todo-pwa/',
+        '/todo-pwa/index.html',
+        '/todo-pwa/manifest.json',
+        '/todo-pwa/icon-192x192.png',
+        '/todo-pwa/icon-512x512.png'
       ]);
     })
   );
@@ -28,3 +28,4 @@ self.addEventListener('fetch', event => {
     })
   );
 });
+
